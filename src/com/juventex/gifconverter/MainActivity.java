@@ -5,13 +5,18 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
+import android.R.bool;
 import android.media.ThumbnailUtils;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.Handler;
 import android.provider.MediaStore;
 import android.app.Activity;
+import android.app.ProgressDialog;
 import android.content.Intent;
 import android.database.Cursor;
 import android.graphics.Bitmap;
@@ -33,6 +38,13 @@ public class MainActivity extends Activity {
 	int curPostion;
 	GridView gridview;
 	String imgPaths[]={"","","","",""};	
+	
+	ProgressDialog progressBar;
+	private int progressBarStatus = 0;
+	private Handler progressBarHandler = new Handler();
+	
+	
+	
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -65,40 +77,49 @@ public class MainActivity extends Activity {
     
     public void onClick(View v)
     {
-    	ByteArrayOutputStream bos = new ByteArrayOutputStream();
-    	AnimatedGifEncoder animGif = new AnimatedGifEncoder();
-    	animGif.start(bos);
-    	animGif.setRepeat(0);
     	EditText fileText = (EditText) findViewById(R.id.fileText);
     	SeekBar delayBar = (SeekBar) findViewById(R.id.delayBar);
-    	int fps=delayBar.getProgress();
-    	animGif.setDelay(fps);
-    	Bitmap anim1;//anim2,anim3,anim4,anim5;
-    	for(int i=0;i<5;i++)
+    	final int fps=delayBar.getProgress();
+    	final String fileName = fileText.getText().toString();
+    	if(validateInputs(fileName, fps))
     	{
-    		//Toast.makeText(this, imgPaths[i]+"start", Toast.LENGTH_SHORT);
-    		anim1 = ThumbnailUtils.extractThumbnail(BitmapFactory.decodeFile(imgPaths[i]), 512, 512);//BitmapFactory.decodeResource(getResources(), R.drawable.anim1);
-        	//Toast.makeText(this, imgPaths[i]+"finish", Toast.LENGTH_SHORT);
-    		animGif.addFrame(anim1);
-        	anim1.recycle();
+    		progressBar = new ProgressDialog(v.getContext());
+			progressBar.setCancelable(false);
+			progressBar.setMessage("GIF is creating...");
+			progressBar.setProgressStyle(ProgressDialog.STYLE_SPINNER);
+    		progressBar.show();
+			progressBarStatus = 0;
+			
+			new Thread(new Runnable() {
+				  public void run() {
+					  
+					    ByteArrayOutputStream bos = new ByteArrayOutputStream();
+				    	AnimatedGifEncoder animGif = new AnimatedGifEncoder();
+				    	animGif.start(bos);
+				    	animGif.setRepeat(0);
+				    	
+				    	animGif.setDelay(fps);
+				    	Bitmap anim1;//anim2,anim3,anim4,anim5;
+				    	for(int i=0;i<5;i++)
+				    	{
+				    		//Toast.makeText(this, imgPaths[i]+"start", Toast.LENGTH_SHORT);
+				    		anim1 = ThumbnailUtils.extractThumbnail(BitmapFactory.decodeFile(imgPaths[i]), 512, 512);//BitmapFactory.decodeResource(getResources(), R.drawable.anim1);
+				        	//Toast.makeText(this, imgPaths[i]+"finish", Toast.LENGTH_SHORT);
+				    		animGif.addFrame(anim1);
+				        	anim1.recycle();
+				    	}
+				
+				    	animGif.finish();
+				    	//Toast.makeText(this, "file creation start", Toast.LENGTH_SHORT);
+				    	save(bos,fileName);
+				    	//Toast.makeText(this, "file creation finish", Toast.LENGTH_SHORT);
+	
+					    progressBar.dismiss();
+				  }
+			       }).start();
+    		
+			
     	}
-    	/*anim1 = BitmapFactory.decodeResource(getResources(), R.drawable.anim1);
-    	animGif.addFrame(anim1);
-    	anim1.recycle();
-    	anim2 = BitmapFactory.decodeResource(getResources(), R.drawable.anim2);
-    	animGif.addFrame(anim2);
-    	anim2.recycle();
-    	anim3 = BitmapFactory.decodeResource(getResources(), R.drawable.anim3);
-    	animGif.addFrame(anim3);
-    	anim3.recycle();
-    	anim4 = BitmapFactory.decodeResource(getResources(), R.drawable.anim4);
-    	animGif.addFrame(anim4);
-    	anim4.recycle();*/
-
-    	animGif.finish();
-    	//Toast.makeText(this, "file creation start", Toast.LENGTH_SHORT);
-    	save(bos,fileText.getText().toString());
-    	//Toast.makeText(this, "file creation finish", Toast.LENGTH_SHORT);
     }
     
     private void save(ByteArrayOutputStream os, String fileName){
@@ -147,8 +168,38 @@ public class MainActivity extends Activity {
     	            Bitmap yourSelectedImage = BitmapFactory.decodeFile(filePath);
     	            curImageView.setImageBitmap(ThumbnailUtils.extractThumbnail(yourSelectedImage, 120, 120));
     	            imgPaths[curPostion] = filePath;
-    	            Toast.makeText(MainActivity.this, "" + selectedImage, Toast.LENGTH_SHORT).show();
+    	            Toast.makeText(MainActivity.this, "" + selectedImage, Toast.LENGTH_LONG).show();
     	        }
     	    }
     	}
+    
+    private boolean validateInputs(String file,int fps)
+    {
+    	boolean result = true;
+    	String msg="";
+    	Pattern p = Pattern.compile("[^a-z0-9 ]", Pattern.CASE_INSENSITIVE);
+    	Matcher m = p.matcher(file);
+    	if(file.isEmpty()|| m.find())
+    	{
+    		msg+="Re-enter file name\n";
+    		result= false;
+    	}
+    	if(fps==0)
+    	{
+    		msg+="Delay cannot be zero\n";
+    		result= false;
+    	}
+    	for(int i=0;i<5;i++)
+    	{
+    		if(imgPaths[i].isEmpty())
+    		{
+    			msg+="Five images should be given as input\n";
+    			result= false;
+    			break;
+    		}
+    	}
+    	if(!result)
+    		Toast.makeText(this, msg, Toast.LENGTH_SHORT).show();
+    	return result;
+    }
 }
